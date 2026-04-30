@@ -36,7 +36,7 @@ export function RoadScene() {
         scene.add(dir)
 
         // ── Carretera ───────────────────────────────────
-        buildRoad(scene)
+        const roadGroup = buildRoad(scene)
 
         // ── Obstáculos ──────────────────────────────────
         const obstacleManager = new ObstacleManager(scene)
@@ -49,18 +49,24 @@ export function RoadScene() {
         }
         window.addEventListener('resize', onResize)
 
-        // ── Loop: cámara avanza infinitamente ───────────
-        let t = 0
+        // ── Loop: avance infinito real ───────────
+        let cameraZ = -8
         let animId
         const loop = () => {
             animId = requestAnimationFrame(loop)
-            // Aumentamos la velocidad de 0.04 a 0.25 para que vaya MUY rápido
-            t += 0.25 
-            camera.position.z = -8 + (t % 180)
-            camera.lookAt(0, 0, camera.position.z + 18)
+            
+            // Avance lineal (no hay % porque es infinito)
+            cameraZ += 0.4 
+            camera.position.z = cameraZ
+            camera.lookAt(0, 0, cameraZ + 20)
+
+            // Reciclaje de la carretera: 
+            // Movemos el grupo de carretera para que siempre esté centrado en la cámara
+            // Pero hacemos que las líneas parezcan moverse usando un offset
+            roadGroup.position.z = Math.floor(cameraZ / 10) * 10
 
             // Actualizar obstáculos
-            obstacleManager.update(camera.position.z)
+            obstacleManager.update(cameraZ)
 
             renderer.render(scene, camera)
         }
