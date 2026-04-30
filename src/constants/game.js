@@ -1,5 +1,5 @@
 export const ROAD_HALF       = 2.4    // límite lateral del carril
-export const CAR_SPEED       = 8      // unidades/seg de avance de escena
+export const CAR_SPEED       = 20      // unidades/seg de avance de escena
 export const CAR_LERP        = 0.12   // suavizado del mouse
 
 // Obstáculos

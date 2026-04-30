@@ -1,13 +1,13 @@
 import * as THREE from 'three'
 
 // ── Constantes de carretera ──────────────────────────────────────────────────
-const CHUNK_LENGTH = 40       // longitud de cada segmento de carretera
-const CHUNK_COUNT  = 6        // cuántos chunks activos simultáneamente
+const CHUNK_LENGTH = 40
+const CHUNK_COUNT  = 6
 const ROAD_WIDTH   = 6
-const DASH_SPACING = 5        // separación entre líneas punteadas
+const DASH_SPACING = 5
 const DASHES_PER_CHUNK = Math.floor(CHUNK_LENGTH / DASH_SPACING)
 
-// ── Materiales compartidos (se crean una sola vez) ───────────────────────────
+// ── Materiales compartidos ───────────────────────────────────────────────────
 const MAT = {
     road:   new THREE.MeshLambertMaterial({ color: 0x1a1a2e }),
     grass:  new THREE.MeshLambertMaterial({ color: 0x0e1f0e }),
@@ -110,12 +110,6 @@ function createChunk(scene, chunkIndex) {
 }
 
 // ── API pública ──────────────────────────────────────────────────────────────
-
-/**
- * buildRoad(scene)
- * Inicializa los chunks y retorna updateRoad(cameraZ) para llamar en el loop.
- * updateRoad recicla los chunks que quedaron atrás de la cámara.
- */
 export function buildRoad(scene) {
     const chunks = []
 
@@ -127,7 +121,6 @@ export function buildRoad(scene) {
 
     function updateRoad(cameraZ) {
         for (const chunk of chunks) {
-            // Si el chunk quedó más de un CHUNK_LENGTH atrás de la cámara, reciclarlo
             if (chunk.position.z < cameraZ - CHUNK_LENGTH) {
                 chunk.position.z = (nextChunkIndex * CHUNK_LENGTH) + CHUNK_LENGTH / 2
                 nextChunkIndex++
