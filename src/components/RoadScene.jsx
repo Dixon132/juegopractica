@@ -12,6 +12,7 @@ import { deathTracker } from '../utils/deathTracker'
 const FOG_COLOR   = 0x07080f
 const FOG_NEAR    = 30
 const FOG_FAR     = 90
+const FINISH_LINE = 500  // Meta a 500 metros
 
 // ── Setup helpers ────────────────────────────────────────────────────────────
 function createRenderer(canvas) {
@@ -57,7 +58,8 @@ function checkCollisions(car, obstacles) {
 export function RoadScene() {
     const canvasRef = useRef(null)
     const { update, triggerBounce } = useCarController(canvasRef)
-    const [dead, setDead] = useState(false)
+    const [gameOver, setGameOver] = useState(false)
+    const [won, setWon] = useState(false)
     const [elapsed, setElapsed] = useState(0)
     const [distance, setDistance] = useState(0)
     const [deathCount, setDeathCount] = useState(0)
@@ -94,6 +96,18 @@ export function RoadScene() {
         // ── Auto ─────────────────────────────────────────
         const car = buildCar(scene)
 
+        // ── Línea de meta ────────────────────────────────
+        const finishGeo = new THREE.PlaneGeometry(8, 0.5)
+        const finishMat = new THREE.MeshBasicMaterial({ 
+            color: 0xffff00,
+            emissive: 0xffff00,
+            emissiveIntensity: 0.8
+        })
+        const finishLine = new THREE.Mesh(finishGeo, finishMat)
+        finishLine.rotation.x = -Math.PI / 2
+        finishLine.position.set(0, 0.05, FINISH_LINE)
+        scene.add(finishLine)
+
         // ── Obstáculos ───────────────────────────────────
         const obstacleManager = new ObstacleManager(scene)
 
@@ -116,7 +130,7 @@ export function RoadScene() {
             const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0
             lastTs = ts
 
-            if (gameStateRef.current.dead) {
+            if (gameStateRef.current.dead || gameStateRef.current.finished) {
                 renderer.render(scene, camera)
                 return
             }
@@ -125,6 +139,14 @@ export function RoadScene() {
             const elapsedSec = (ts - gameStateRef.current.startTime) / 1000
             setElapsed(elapsedSec)
             setDistance(scrollZ)
+            
+            console.log('ScrollZ:', scrollZ.toFixed(2), 'Progress:', (scrollZ/FINISH_LINE*100).toFixed(1) + '%')
+
+            // Verificar si llegó a la meta
+            if (scrollZ >= FINISH_LINE && !gameStateRef.current.finished) {
+                gameStateRef.current.finished = true
+                setWon(true)
+            }
 
             // ROAD — reciclar chunks
             updateRoad(scrollZ)
@@ -146,9 +168,28 @@ export function RoadScene() {
             obstacleManager.update(scrollZ)
             
             if (checkCollisions(car, obstacleManager.obstacles)) {
-                gameStateRef.current.dead = true
-                setDead(true)
                 triggerBounce()
+                gameStateRef.current.lives--
+                setLives(gameStateRef.current.lives)
+                
+                // Remover obstáculo con el que chocó
+                for (let i = obstacleManager.obstacles.length - 1; i >= 0; i--) {
+                    const obs = obstacleManager.obstacles[i]
+                    if (obs.position.y <= 1) {
+                        const obsBox = new THREE.Box3().setFromObject(obs)
+                        const carBox = new THREE.Box3().setFromObject(car)
+                        if (carBox.intersectsBox(obsBox)) {
+                            scene.remove(obs)
+                            obstacleManager.obstacles.splice(i, 1)
+                            break
+                        }
+                    }
+                }
+                
+                if (gameStateRef.current.lives <= 0) {
+                    gameStateRef.current.dead = true
+                    setGameOver(true)
+                }
             }
 
             renderer.render(scene, camera)
@@ -165,6 +206,13 @@ export function RoadScene() {
     const handleRetry = () => {
         window.location.reload()
     }
+
+    const progress = distance / FINISH_LINE
+    const progressPercent = Math.min(progress * 100, 100)
+    const minutes = Math.floor(elapsed / 60)
+    const seconds = Math.floor(elapsed % 60)
+
+    console.log('UI - Distance:', distance.toFixed(2), 'Progress:', progressPercent.toFixed(1) + '%')
 
     return (
         <>
