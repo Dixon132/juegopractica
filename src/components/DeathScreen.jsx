@@ -5,7 +5,7 @@ import styles from './DeathScreen.module.css'
  * Pantalla que aparece cuando el auto choca.
  * Muestra tiempo sobrevivido y distancia. Botón para reintentar.
  */
-export function DeathScreen({ visible, elapsed, distance, onRetry }) {
+export function DeathScreen({ visible, elapsed, distance, deaths, onRetry }) {
     if (!visible) return null
 
     const m = Math.floor(elapsed / 60)
@@ -18,6 +18,9 @@ export function DeathScreen({ visible, elapsed, distance, onRetry }) {
             <h1 className={styles.title}>CHOCASTE</h1>
             <p className={styles.stats}>
                 {time} sobrevivido · {Math.floor(distance)}m recorridos
+            </p>
+            <p className={styles.deaths}>
+                Muertes totales: {deaths}
             </p>
             <button className={styles.btn} onClick={onRetry}>
                 Reintentar

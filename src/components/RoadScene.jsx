@@ -6,6 +6,7 @@ import { ObstacleManager } from '../utils/obstacles'
 import { useCarController } from '../hooks/useCarController'
 import { DeathScreen } from './DeathScreen'
 import { CAR_SPEED } from '../constants/game'
+import { deathTracker } from '../utils/deathTracker'
 
 // ── Constantes de escena ─────────────────────────────────────────────────────
 const FOG_COLOR   = 0x07080f
@@ -61,8 +62,21 @@ export function RoadScene() {
     const [won, setWon] = useState(false)
     const [elapsed, setElapsed] = useState(0)
     const [distance, setDistance] = useState(0)
-    const [lives, setLives] = useState(5)
-    const gameStateRef = useRef({ dead: false, startTime: 0, lives: 5, finished: false })
+    const [deathCount, setDeathCount] = useState(0)
+    const gameStateRef = useRef({ dead: false, startTime: 0 })
+
+    const incrementedRef = useRef(false)
+
+    // Incrementar muertes solo cuando el estado 'dead' cambie a true
+    useEffect(() => {
+        if (dead && !incrementedRef.current) {
+            const next = deathTracker.incrementDeaths()
+            setDeathCount(next)
+            incrementedRef.current = true
+        } else if (!dead) {
+            incrementedRef.current = false
+        }
+    }, [dead])
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -206,182 +220,13 @@ export function RoadScene() {
                 ref={canvasRef}
                 style={{ width: '100%', height: '100vh', display: 'block', background: '#07080f' }}
             />
-
-            {/* HUD superior */}
-            {!gameOver && !won && (
-                <>
-                    {/* Barra de progreso */}
-                    <div style={{
-                        position: 'fixed',
-                        top: '20px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '400px',
-                        height: '30px',
-                        background: 'rgba(0,0,0,0.7)',
-                        borderRadius: '20px',
-                        overflow: 'hidden',
-                        zIndex: 9999,
-                        border: '3px solid #00ff00',
-                        boxShadow: '0 0 15px rgba(0,255,0,0.5)'
-                    }}>
-                        <div style={{
-                            width: `${progressPercent}%`,
-                            height: '100%',
-                            background: 'linear-gradient(90deg, #00ff00, #00cc00)',
-                            transition: 'width 0.3s ease-out',
-                            boxShadow: '0 0 15px rgba(0,255,0,0.8)'
-                        }} />
-                        <span style={{
-                            position: 'absolute',
-                            width: '100%',
-                            textAlign: 'center',
-                            color: 'white',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-                            fontFamily: 'monospace'
-                        }}>
-                            {Math.floor(distance)}m / {FINISH_LINE}m ({progressPercent.toFixed(0)}%)
-                        </span>
-                    </div>
-
-                    {/* Contador de tiempo */}
-                    <div style={{
-                        position: 'fixed',
-                        top: '20px',
-                        left: '30px',
-                        color: 'white',
-                        fontSize: '24px',
-                        fontWeight: 'bold',
-                        fontFamily: 'monospace',
-                        textShadow: '0 0 10px rgba(0,255,204,0.8)',
-                        zIndex: 9999,
-                        background: 'rgba(0,0,0,0.6)',
-                        padding: '10px 20px',
-                        borderRadius: '10px',
-                        border: '2px solid #00ffcc'
-                    }}>
-                        ⏱️ {minutes}:{seconds < 10 ? '0' : ''}{seconds}
-                    </div>
-
-                    {/* Corazones (vidas) */}
-                    <div style={{
-                        position: 'fixed',
-                        top: '20px',
-                        right: '30px',
-                        fontSize: '30px',
-                        zIndex: 9999,
-                        display: 'flex',
-                        gap: '8px'
-                    }}>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                            <span key={i} style={{
-                                opacity: i < lives ? 1 : 0.2,
-                                transition: 'opacity 0.3s',
-                                filter: i < lives ? 'drop-shadow(0 0 8px #ff0066)' : 'none'
-                            }}>
-                                ❤️
-                            </span>
-                        ))}
-                    </div>
-                </>
-            )}
-
-            {/* Pantalla de Game Over */}
-            {gameOver && (
-                <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(7, 8, 15, 0.88)',
-                    zIndex: 40,
-                    backdropFilter: 'blur(6px)'
-                }}>
-                    <div style={{ fontSize: '52px', marginBottom: '12px' }}>💀</div>
-                    <h1 style={{
-                        fontFamily: 'monospace',
-                        fontSize: '28px',
-                        letterSpacing: '4px',
-                        color: '#E24B4A',
-                        marginBottom: '10px'
-                    }}>GAME OVER</h1>
-                    <p style={{
-                        fontFamily: 'monospace',
-                        fontSize: '13px',
-                        color: 'rgba(255, 255, 255, 0.4)',
-                        marginBottom: '24px'
-                    }}>
-                        {minutes}:{seconds < 10 ? '0' : ''}{seconds} · {Math.floor(distance)}m recorridos
-                    </p>
-                    <button onClick={handleRetry} style={{
-                        padding: '12px 36px',
-                        background: '#E24B4A',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontFamily: 'monospace',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        letterSpacing: '1px',
-                        transition: 'background 0.15s, transform 0.1s'
-                    }}>
-                        Reintentar
-                    </button>
-                </div>
-            )}
-
-            {/* Pantalla de Victoria */}
-            {won && (
-                <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(7, 8, 15, 0.88)',
-                    zIndex: 40,
-                    backdropFilter: 'blur(6px)'
-                }}>
-                    <div style={{ fontSize: '52px', marginBottom: '12px' }}>🏆</div>
-                    <h1 style={{
-                        fontFamily: 'monospace',
-                        fontSize: '28px',
-                        letterSpacing: '4px',
-                        color: '#00ffcc',
-                        marginBottom: '10px'
-                    }}>¡GANASTE!</h1>
-                    <p style={{
-                        fontFamily: 'monospace',
-                        fontSize: '13px',
-                        color: 'rgba(255, 255, 255, 0.4)',
-                        marginBottom: '24px'
-                    }}>
-                        Tiempo: {minutes}:{seconds < 10 ? '0' : ''}{seconds} · Vidas restantes: {lives}
-                    </p>
-                    <button onClick={handleRetry} style={{
-                        padding: '12px 36px',
-                        background: '#00ffcc',
-                        color: '#000',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontFamily: 'monospace',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        letterSpacing: '1px',
-                        fontWeight: 'bold',
-                        transition: 'background 0.15s, transform 0.1s'
-                    }}>
-                        Jugar de nuevo
-                    </button>
-                </div>
-            )}
+            <DeathScreen
+                visible={dead}
+                elapsed={elapsed}
+                distance={distance}
+                deaths={deathCount}
+                onRetry={handleRetry}
+            />
         </>
     )
 }
