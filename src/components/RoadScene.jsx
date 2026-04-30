@@ -54,7 +54,8 @@ export function RoadScene() {
         let animId
         const loop = () => {
             animId = requestAnimationFrame(loop)
-            t += 0.04
+            // Aumentamos la velocidad de 0.04 a 0.25 para que vaya MUY rápido
+            t += 0.25 
             camera.position.z = -8 + (t % 180)
             camera.lookAt(0, 0, camera.position.z + 18)
 

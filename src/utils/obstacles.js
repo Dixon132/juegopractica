@@ -8,25 +8,25 @@ export class ObstacleManager {
         this.cubeGeometry = new THREE.BoxGeometry(this.cubeSize, this.cubeSize, this.cubeSize)
         this.cubeMaterial = new THREE.MeshLambertMaterial({ color: 0xff4444 })
         
-        this.spawnDistance = 25 // Distancia entre oleadas
+        this.spawnDistance = 20 
         this.lastSpawnZ = -50
         this.prevCameraZ = 0
         this.lanes = [-2, 0, 2]
         
-        this.gravity = -0.02
-        this.bounce = 0.3
-        this.friction = 0.98
+        // --- Físicas Extremas ---
+        this.gravity = -0.06      // Gravedad mucho más fuerte
+        this.initialFallSpeed = -0.5 // Velocidad inicial hacia abajo (ya salen disparados)
+        this.bounce = 0.15        // Menos rebote para que se queden en la carretera rápido
+        this.friction = 0.99
     }
 
     update(cameraZ) {
-        // DETECTAR REINICIO: Si la cámara salta bruscamente hacia atrás
         if (cameraZ < this.prevCameraZ - 10) {
             this.lastSpawnZ = cameraZ
             this.clearAll()
         }
         this.prevCameraZ = cameraZ
 
-        // Generación basada en distancia
         if (cameraZ + 80 > this.lastSpawnZ + this.spawnDistance) {
             this.spawnGroup(cameraZ)
         }
@@ -38,13 +38,13 @@ export class ObstacleManager {
             obstacle.userData.velocity.y *= this.friction
             obstacle.position.y += obstacle.userData.velocity.y
             
-            obstacle.rotation.x += 0.05
-            obstacle.rotation.z += 0.05
+            obstacle.rotation.x += 0.1 // Rotación más rápida para dar sensación de velocidad
+            obstacle.rotation.z += 0.1
 
             const groundLevel = this.cubeSize / 2
             if (obstacle.position.y <= groundLevel) {
                 obstacle.position.y = groundLevel
-                if (Math.abs(obstacle.userData.velocity.y) > 0.02) {
+                if (Math.abs(obstacle.userData.velocity.y) > 0.05) {
                     obstacle.userData.velocity.y *= -this.bounce
                 } else {
                     obstacle.userData.velocity.y = 0
@@ -64,22 +64,28 @@ export class ObstacleManager {
     }
 
     spawnGroup(cameraZ) {
-        // Actualizamos el punto donde generamos el siguiente grupo
         this.lastSpawnZ = cameraZ + 80
-
         const numObstacles = Math.random() > 0.6 ? 2 : 1
         const shuffledLanes = [...this.lanes].sort(() => Math.random() - 0.5)
         
         for (let i = 0; i < numObstacles; i++) {
-            this.createObstacle(shuffledLanes[i], cameraZ + 90)
+            this.createObstacle(shuffledLanes[i], cameraZ + 95)
         }
     }
 
     createObstacle(x, z) {
         const cube = new THREE.Mesh(this.cubeGeometry, this.cubeMaterial)
-        cube.position.set(x, 15, z)
+        cube.position.set(x, 25, z) // Caen desde más arriba para dar tiempo al efecto
         cube.castShadow = true
-        cube.userData = { velocity: { y: 0, z: 0 } }
+        
+        // Empezamos con velocidad inicial descendente para que no "floten" al salir
+        cube.userData = { 
+            velocity: { 
+                y: this.initialFallSpeed, 
+                z: 0 
+            } 
+        }
+        
         this.scene.add(cube)
         this.obstacles.push(cube)
     }
