@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { buildRoad } from '../utils/buildRoad'
+import { ObstacleManager } from '../utils/obstacles'
 
 
 export function RoadScene() {
@@ -37,6 +38,9 @@ export function RoadScene() {
         // ── Carretera ───────────────────────────────────
         buildRoad(scene)
 
+        // ── Obstáculos ──────────────────────────────────
+        const obstacleManager = new ObstacleManager(scene)
+
         // ── Resize ──────────────────────────────────────
         const onResize = () => {
             renderer.setSize(canvas.clientWidth, canvas.clientHeight)
@@ -53,6 +57,10 @@ export function RoadScene() {
             t += 0.04
             camera.position.z = -8 + (t % 180)
             camera.lookAt(0, 0, camera.position.z + 18)
+
+            // Actualizar obstáculos
+            obstacleManager.update(camera.position.z)
+
             renderer.render(scene, camera)
         }
         loop()
