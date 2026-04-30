@@ -6,22 +6,18 @@ import { ObstacleManager } from '../utils/obstacles'
 
 export function RoadScene() {
     const canvasRef = useRef(null)
+    const { update /*, triggerBounce */ } = useCarController(canvasRef) // ← NUEVO
 
     useEffect(() => {
         const canvas = canvasRef.current
 
-        // ── Escena + Cámara + Renderer ──────────────────
+        // ── Escena ──────────────────────────────────────
         const scene = new THREE.Scene()
         scene.fog = new THREE.Fog(0x07080f, 30, 80)
 
         const camera = new THREE.PerspectiveCamera(
-            55,
-            canvas.clientWidth / canvas.clientHeight,
-            0.1,
-            200
+            55, canvas.clientWidth / canvas.clientHeight, 0.1, 200
         )
-        camera.position.set(0, 3.8, -8)
-        camera.lookAt(0, 0, 10)
 
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -52,7 +48,8 @@ export function RoadScene() {
         // ── Loop: avance infinito real ───────────
         let cameraZ = -8
         let animId
-        const loop = () => {
+
+        const loop = (ts) => {
             animId = requestAnimationFrame(loop)
             
             // Avance lineal (no hay % porque es infinito)
@@ -70,14 +67,14 @@ export function RoadScene() {
 
             renderer.render(scene, camera)
         }
-        loop()
+        loop(0)
 
         return () => {
             cancelAnimationFrame(animId)
             window.removeEventListener('resize', onResize)
             renderer.dispose()
         }
-    }, [])
+    }, [update])
 
     return (
         <canvas
