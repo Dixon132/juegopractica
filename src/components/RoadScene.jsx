@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { buildRoad } from '../utils/buildRoad'
-import { buildCar } from '../utils/buildCar'        // ← NUEVO
-import { useCarController } from '../hooks/useCarController' // ← NUEVO
+import { ObstacleManager } from '../utils/obstacles'
+
 
 export function RoadScene() {
     const canvasRef = useRef(null)
@@ -31,14 +31,11 @@ export function RoadScene() {
         dir.castShadow = true
         scene.add(dir)
 
-        const headLight = new THREE.PointLight(0xffffcc, 1.5, 18) // ← NUEVO
-        scene.add(headLight)
+        // ── Carretera ───────────────────────────────────
+        const roadGroup = buildRoad(scene)
 
-        // ── Objetos 3D ──────────────────────────────────
-        buildRoad(scene)
-        const car = buildCar(scene)                               // ← NUEVO
-        const car2 = buildCar(scene)                               // ← NUEVO
-
+        // ── Obstáculos ──────────────────────────────────
+        const obstacleManager = new ObstacleManager(scene)
 
         // ── Resize ──────────────────────────────────────
         const onResize = () => {
@@ -48,31 +45,25 @@ export function RoadScene() {
         }
         window.addEventListener('resize', onResize)
 
-        // ── Game loop ───────────────────────────────────
-        let scrollZ = 0
-        let lastTs = null
+        // ── Loop: avance infinito real ───────────
+        let cameraZ = -8
         let animId
 
         const loop = (ts) => {
             animId = requestAnimationFrame(loop)
-            const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0
-            lastTs = ts
+            
+            // Avance lineal (no hay % porque es infinito)
+            cameraZ += 0.4 
+            camera.position.z = cameraZ
+            camera.lookAt(0, 0, cameraZ + 20)
 
-            // Avance automático de la escena
-            scrollZ += 8 * dt
+            // Reciclaje de la carretera: 
+            // Movemos el grupo de carretera para que siempre esté centrado en la cámara
+            // Pero hacemos que las líneas parezcan moverse usando un offset
+            roadGroup.position.z = Math.floor(cameraZ / 10) * 10
 
-            // Actualizar posición del auto con el controller   // ← NUEVO
-            const { x, z, tiltZ, tiltX } = update(scrollZ, dt)
-            car.position.set(x, 0, z)
-            car.rotation.z = tiltZ
-            car.rotation.x = tiltX
-
-            // Cámara sigue al auto desde atrás                 // ← NUEVO
-            camera.position.set(x * 0.3, 3.8, z - 8)
-            camera.lookAt(x * 0.5, 0.5, z + 12)
-
-            // Luz de faros se mueve con el auto                // ← NUEVO
-            headLight.position.set(x, 2, z + 3)
+            // Actualizar obstáculos
+            obstacleManager.update(cameraZ)
 
             renderer.render(scene, camera)
         }
