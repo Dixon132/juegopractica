@@ -1,46 +1,71 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { buildRoad } from '../utils/buildRoad'
-import { buildCar } from '../utils/buildCar'        // ← NUEVO
-import { useCarController } from '../hooks/useCarController' // ← NUEVO
+import { buildCar }  from '../utils/buildCar'
+import { useCarController } from '../hooks/useCarController'
 
+// ── Constantes de escena ─────────────────────────────────────────────────────
+const SPEED       = 8      // unidades/segundo de avance
+const FOG_COLOR   = 0x07080f
+const FOG_NEAR    = 30
+const FOG_FAR     = 90
+
+// ── Setup helpers ────────────────────────────────────────────────────────────
+function createRenderer(canvas) {
+    const r = new THREE.WebGLRenderer({ canvas, antialias: true })
+    r.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    r.setSize(canvas.clientWidth, canvas.clientHeight)
+    r.shadowMap.enabled = true
+    return r
+}
+
+function createCamera(canvas) {
+    return new THREE.PerspectiveCamera(
+        55, canvas.clientWidth / canvas.clientHeight, 0.1, 200
+    )
+}
+
+function setupLights(scene) {
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.2)
+    sun.position.set(5, 12, 5)
+    sun.castShadow = true
+    scene.add(sun)
+
+    const headLight = new THREE.PointLight(0xffffcc, 1.5, 18)
+    scene.add(headLight)
+
+    return { headLight }
+}
+
+// ── Componente ───────────────────────────────────────────────────────────────
 export function RoadScene() {
     const canvasRef = useRef(null)
-    const { update /*, triggerBounce */ } = useCarController(canvasRef) // ← NUEVO
+    const { update } = useCarController(canvasRef)
 
     useEffect(() => {
         const canvas = canvasRef.current
 
-        // ── Escena ──────────────────────────────────────
-        const scene = new THREE.Scene()
-        scene.fog = new THREE.Fog(0x07080f, 30, 80)
+        // ── Escena base ──────────────────────────────────
+        const scene    = new THREE.Scene()
+        scene.fog      = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR)
+        const camera   = createCamera(canvas)
+        const renderer = createRenderer(canvas)
 
-        const camera = new THREE.PerspectiveCamera(
-            55, canvas.clientWidth / canvas.clientHeight, 0.1, 200
-        )
+        // ── Luces ────────────────────────────────────────
+        const { headLight } = setupLights(scene)
 
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-        renderer.setSize(canvas.clientWidth, canvas.clientHeight)
-        renderer.shadowMap.enabled = true
+        // ── Carretera ────────────────────────────────────
+        const { updateRoad } = buildRoad(scene)
 
-        // ── Luces ───────────────────────────────────────
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4))
-        const dir = new THREE.DirectionalLight(0xffffff, 1.2)
-        dir.position.set(5, 12, 5)
-        dir.castShadow = true
-        scene.add(dir)
+        // ── Auto ─────────────────────────────────────────
+        const car = buildCar(scene)
 
-        const headLight = new THREE.PointLight(0xffffcc, 1.5, 18) // ← NUEVO
-        scene.add(headLight)
+        // ── Obstáculos (TODO) ─────────────────────────────
+        // const obstacleManager = buildObstacles(scene)
 
-        // ── Objetos 3D ──────────────────────────────────
-        buildRoad(scene)
-        const car = buildCar(scene)                               // ← NUEVO
-        const car2 = buildCar(scene)                               // ← NUEVO
-
-
-        // ── Resize ──────────────────────────────────────
+        // ── Resize ───────────────────────────────────────
         const onResize = () => {
             renderer.setSize(canvas.clientWidth, canvas.clientHeight)
             camera.aspect = canvas.clientWidth / canvas.clientHeight
@@ -48,9 +73,9 @@ export function RoadScene() {
         }
         window.addEventListener('resize', onResize)
 
-        // ── Game loop ───────────────────────────────────
+        // ── Game loop ────────────────────────────────────
         let scrollZ = 0
-        let lastTs = null
+        let lastTs  = null
         let animId
 
         const loop = (ts) => {
@@ -58,21 +83,26 @@ export function RoadScene() {
             const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0
             lastTs = ts
 
-            // Avance automático de la escena
-            scrollZ += 8 * dt
+            scrollZ += SPEED * dt
 
-            // Actualizar posición del auto con el controller   // ← NUEVO
+            // ROAD — reciclar chunks
+            updateRoad(scrollZ)
+
+            // CAR — posición y orientación
             const { x, z, tiltZ, tiltX } = update(scrollZ, dt)
             car.position.set(x, 0, z)
             car.rotation.z = tiltZ
             car.rotation.x = tiltX
 
-            // Cámara sigue al auto desde atrás                 // ← NUEVO
+            // CAMERA — sigue al auto
             camera.position.set(x * 0.3, 3.8, z - 8)
             camera.lookAt(x * 0.5, 0.5, z + 12)
 
-            // Luz de faros se mueve con el auto                // ← NUEVO
+            // LIGHTS — faros siguen al auto
             headLight.position.set(x, 2, z + 3)
+
+            // OBSTACLES — (TODO)
+            // obstacleManager.update(scrollZ, car, triggerBounce)
 
             renderer.render(scene, camera)
         }

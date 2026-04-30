@@ -1,66 +1,139 @@
 import * as THREE from 'three'
 
+// ── Constantes de carretera ──────────────────────────────────────────────────
+const CHUNK_LENGTH = 40       // longitud de cada segmento de carretera
+const CHUNK_COUNT  = 6        // cuántos chunks activos simultáneamente
+const ROAD_WIDTH   = 6
+const DASH_SPACING = 5        // separación entre líneas punteadas
+const DASHES_PER_CHUNK = Math.floor(CHUNK_LENGTH / DASH_SPACING)
+
+// ── Materiales compartidos (se crean una sola vez) ───────────────────────────
+const MAT = {
+    road:   new THREE.MeshLambertMaterial({ color: 0x1a1a2e }),
+    grass:  new THREE.MeshLambertMaterial({ color: 0x0e1f0e }),
+    dash:   new THREE.MeshLambertMaterial({ color: 0xffffaa }),
+    edge:   new THREE.MeshLambertMaterial({ color: 0xffffff }),
+    trunk:  new THREE.MeshLambertMaterial({ color: 0x5a3a1a }),
+    leaves: new THREE.MeshLambertMaterial({ color: 0x2d5a1e }),
+    pole:   new THREE.MeshLambertMaterial({ color: 0x888888 }),
+    lamp:   new THREE.MeshLambertMaterial({ color: 0xffffcc, emissive: 0xffff88, emissiveIntensity: 1 }),
+}
+
+// ── Geometrías compartidas ───────────────────────────────────────────────────
+const GEO = {
+    road:   new THREE.PlaneGeometry(ROAD_WIDTH, CHUNK_LENGTH),
+    grass:  new THREE.PlaneGeometry(30, CHUNK_LENGTH),
+    dash:   new THREE.PlaneGeometry(0.08, 2.5),
+    edgeL:  new THREE.PlaneGeometry(0.12, CHUNK_LENGTH),
+    trunk:  new THREE.CylinderGeometry(0.12, 0.18, 1.6, 6),
+    leaves: new THREE.SphereGeometry(0.8, 6, 5),
+    pole:   new THREE.CylinderGeometry(0.06, 0.06, 4, 6),
+    lamp:   new THREE.SphereGeometry(0.18, 6, 4),
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function makePlane(geo, mat, x, z) {
+    const m = new THREE.Mesh(geo, mat)
+    m.rotation.x = -Math.PI / 2
+    m.position.set(x, 0, z)
+    m.receiveShadow = true
+    return m
+}
+
+function makeTree(x, z) {
+    const group = new THREE.Group()
+    const trunk = new THREE.Mesh(GEO.trunk, MAT.trunk)
+    trunk.position.set(0, 0.8, 0)
+    trunk.castShadow = true
+    const leaves = new THREE.Mesh(GEO.leaves, MAT.leaves)
+    leaves.position.set(0, 2.2, 0)
+    leaves.castShadow = true
+    group.add(trunk, leaves)
+    group.position.set(x, 0, z)
+    return group
+}
+
+function makeLampPost(x, z) {
+    const group = new THREE.Group()
+    const pole = new THREE.Mesh(GEO.pole, MAT.pole)
+    pole.position.set(0, 2, 0)
+    const lamp = new THREE.Mesh(GEO.lamp, MAT.lamp)
+    lamp.position.set(0, 4.1, 0)
+    group.add(pole, lamp)
+    group.position.set(x, 0, z)
+    return group
+}
+
+// ── Chunk: un segmento completo de carretera ─────────────────────────────────
+function createChunk(scene, chunkIndex) {
+    const group = new THREE.Group()
+    const z = chunkIndex * CHUNK_LENGTH + CHUNK_LENGTH / 2
+
+    // Asfalto
+    group.add(makePlane(GEO.road, MAT.road, 0, 0))
+
+    // Pasto
+    group.add(makePlane(GEO.grass, MAT.grass, -18, 0))
+    group.add(makePlane(GEO.grass, MAT.grass,  18, 0))
+
+    // Bordes blancos
+    group.add(makePlane(GEO.edgeL, MAT.edge, -3, 0))
+    group.add(makePlane(GEO.edgeL, MAT.edge,  3, 0))
+
+    // Líneas punteadas centrales
+    for (let i = 0; i < DASHES_PER_CHUNK; i++) {
+        const dz = -CHUNK_LENGTH / 2 + i * DASH_SPACING + DASH_SPACING / 2
+        const dash = new THREE.Mesh(GEO.dash, MAT.dash)
+        dash.rotation.x = -Math.PI / 2
+        dash.position.set(0, 0.01, dz)
+        group.add(dash)
+    }
+
+    // Árboles (2-3 por chunk, lados alternados)
+    const treeCount = 2 + Math.floor(Math.random() * 2)
+    for (let i = 0; i < treeCount; i++) {
+        const side = i % 2 === 0 ? -1 : 1
+        const tx = side * (4.5 + Math.random() * 6)
+        const tz = (Math.random() - 0.5) * CHUNK_LENGTH * 0.8
+        group.add(makeTree(tx, tz))
+    }
+
+    // Farola cada 2 chunks (alternando lado)
+    if (chunkIndex % 2 === 0) {
+        const side = chunkIndex % 4 === 0 ? -1 : 1
+        group.add(makeLampPost(side * 4, 0))
+    }
+
+    group.position.z = z
+    scene.add(group)
+    return group
+}
+
+// ── API pública ──────────────────────────────────────────────────────────────
+
+/**
+ * buildRoad(scene)
+ * Inicializa los chunks y retorna updateRoad(cameraZ) para llamar en el loop.
+ * updateRoad recicla los chunks que quedaron atrás de la cámara.
+ */
 export function buildRoad(scene) {
-  // ── Asfalto ──────────────────────────────────────
-  const road = new THREE.Mesh(
-    new THREE.PlaneGeometry(6, 200),
-    new THREE.MeshLambertMaterial({ color: 0x1a1a2e })
-  )
-  road.rotation.x = -Math.PI / 2
-  road.position.z = 90
-  road.receiveShadow = true
-  scene.add(road)
+    const chunks = []
 
-  // ── Pasto a los costados ──────────────────────────
-  ;[-13, 13].forEach(x => {
-    const grass = new THREE.Mesh(
-      new THREE.PlaneGeometry(28, 200),
-      new THREE.MeshLambertMaterial({ color: 0x112211 })
-    )
-    grass.rotation.x = -Math.PI / 2
-    grass.position.set(x, 0, 90)
-    scene.add(grass)
-  })
+    for (let i = 0; i < CHUNK_COUNT; i++) {
+        chunks.push(createChunk(scene, i))
+    }
 
-  // ── Líneas de carril (punteadas) ──────────────────
-  const lineMat = new THREE.MeshLambertMaterial({ color: 0xffffaa })
-  for (let i = 0; i < 40; i++) {
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 2.5), lineMat)
-    line.rotation.x = -Math.PI / 2
-    line.position.set(0, 0.01, i * 5)
-    scene.add(line)
-  }
+    let nextChunkIndex = CHUNK_COUNT
 
-  // ── Bordes blancos del carril ─────────────────────
-  const edgeMat = new THREE.MeshLambertMaterial({ color: 0xffffff })
-  ;[-3, 3].forEach(x => {
-    const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 200), edgeMat)
-    edge.rotation.x = -Math.PI / 2
-    edge.position.set(x, 0.01, 90)
-    scene.add(edge)
-  })
+    function updateRoad(cameraZ) {
+        for (const chunk of chunks) {
+            // Si el chunk quedó más de un CHUNK_LENGTH atrás de la cámara, reciclarlo
+            if (chunk.position.z < cameraZ - CHUNK_LENGTH) {
+                chunk.position.z = (nextChunkIndex * CHUNK_LENGTH) + CHUNK_LENGTH / 2
+                nextChunkIndex++
+            }
+        }
+    }
 
-  // ── Árboles decorativos ───────────────────────────
-  const trunkMat  = new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
-  const leavesMat = new THREE.MeshLambertMaterial({ color: 0x2d4a1e })
-
-  for (let i = 0; i < 28; i++) {
-    const side = Math.random() < 0.5 ? -1 : 1
-    const x = side * (4.5 + Math.random() * 7)
-    const z = Math.random() * 180
-
-    const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.18, 1.4, 6),
-      trunkMat
-    )
-    trunk.position.set(x, 0.7, z)
-    scene.add(trunk)
-
-    const leaves = new THREE.Mesh(
-      new THREE.SphereGeometry(0.7, 6, 5),
-      leavesMat
-    )
-    leaves.position.set(x, 2.0, z)
-    scene.add(leaves)
-  }
+    return { updateRoad }
 }
