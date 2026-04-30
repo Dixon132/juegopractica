@@ -6,6 +6,7 @@ import { ObstacleManager } from '../utils/obstacles'
 import { useCarController } from '../hooks/useCarController'
 import { DeathScreen } from './DeathScreen'
 import { CAR_SPEED } from '../constants/game'
+import { deathTracker } from '../utils/deathTracker'
 
 // ── Constantes de escena ─────────────────────────────────────────────────────
 const FOG_COLOR   = 0x07080f
@@ -59,7 +60,21 @@ export function RoadScene() {
     const [dead, setDead] = useState(false)
     const [elapsed, setElapsed] = useState(0)
     const [distance, setDistance] = useState(0)
+    const [deathCount, setDeathCount] = useState(0)
     const gameStateRef = useRef({ dead: false, startTime: 0 })
+
+    const incrementedRef = useRef(false)
+
+    // Incrementar muertes solo cuando el estado 'dead' cambie a true
+    useEffect(() => {
+        if (dead && !incrementedRef.current) {
+            const next = deathTracker.incrementDeaths()
+            setDeathCount(next)
+            incrementedRef.current = true
+        } else if (!dead) {
+            incrementedRef.current = false
+        }
+    }, [dead])
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -148,10 +163,6 @@ export function RoadScene() {
     }, [update, triggerBounce])
 
     const handleRetry = () => {
-        setDead(false)
-        setElapsed(0)
-        setDistance(0)
-        gameStateRef.current.dead = false
         window.location.reload()
     }
 
@@ -165,6 +176,7 @@ export function RoadScene() {
                 visible={dead}
                 elapsed={elapsed}
                 distance={distance}
+                deaths={deathCount}
                 onRetry={handleRetry}
             />
         </>
