@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { buildRoad } from '../utils/buildRoad'
+import { ObstacleManager } from '../utils/obstacles'
 
 export function RoadScene() {
     const canvasRef = useRef(null)
@@ -9,19 +10,14 @@ export function RoadScene() {
     useEffect(() => {
         const canvas = canvasRef.current
 
-        // ── Escena ───────────────────────────────
+        // ── Escena ──────────────────────────────────────
         const scene = new THREE.Scene()
         scene.fog = new THREE.Fog(0x07080f, 30, 80)
 
         // ── Cámara ──────────────────────────────
         const camera = new THREE.PerspectiveCamera(
-            55,
-            canvas.clientWidth / canvas.clientHeight,
-            0.1,
-            200
+            55, canvas.clientWidth / canvas.clientHeight, 0.1, 200
         )
-        camera.position.set(0, 3.8, -8)
-        camera.lookAt(0, 0, 10)
 
         // ── Renderer ────────────────────────────
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -36,8 +32,11 @@ export function RoadScene() {
         dir.castShadow = true
         scene.add(dir)
 
-        // ── Carretera ───────────────────────────
-        buildRoad(scene)
+        // ── Carretera ───────────────────────────────────
+        const roadGroup = buildRoad(scene)
+
+        // ── Obstáculos ──────────────────────────────────
+        const obstacleManager = new ObstacleManager(scene)
 
         // ── Inicio y fin ────────────────────────
         const inicio = -8
@@ -51,31 +50,36 @@ export function RoadScene() {
         }
         window.addEventListener('resize', onResize)
 
-        // ── Loop ───────────────────────────────
-        let t = 0
+        // ── Loop: avance infinito real ───────────
+        let cameraZ = -8
         let animId
 
-        const loop = () => {
+        const loop = (ts) => {
             animId = requestAnimationFrame(loop)
+            
+            // Avance lineal (no hay % porque es infinito)
+            cameraZ += 0.4 
+            camera.position.z = cameraZ
+            camera.lookAt(0, 0, cameraZ + 20)
 
-            t += 0.04
-            camera.position.z = -8 + (t % 180)
+            // Reciclaje de la carretera: 
+            // Movemos el grupo de carretera para que siempre esté centrado en la cámara
+            // Pero hacemos que las líneas parezcan moverse usando un offset
+            roadGroup.position.z = Math.floor(cameraZ / 10) * 10
 
-            const p = (camera.position.z - inicio) / (fin - inicio)
-            setProgress(Math.min(1, Math.max(0, p)))
+            // Actualizar obstáculos
+            obstacleManager.update(cameraZ)
 
-            camera.lookAt(0, 0, camera.position.z + 18)
             renderer.render(scene, camera)
         }
-
-        loop()
+        loop(0)
 
         return () => {
             cancelAnimationFrame(animId)
             window.removeEventListener('resize', onResize)
             renderer.dispose()
         }
-    }, [])
+    }, [update])
 
     return (
         <>
