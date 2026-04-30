@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { buildRoad } from '../utils/buildRoad'
-import { buildCar }  from '../utils/buildCar'
+import { buildCar } from '../utils/buildCar'
 import { ObstacleManager } from '../utils/obstacles'
 import { useCarController } from '../hooks/useCarController'
 import { DeathScreen } from './DeathScreen'
 import { CAR_SPEED } from '../constants/game'
 
 // ── Constantes de escena ─────────────────────────────────────────────────────
-const FOG_COLOR   = 0x07080f
-const FOG_NEAR    = 30
-const FOG_FAR     = 90
+const FOG_COLOR = 0x07080f
+const FOG_NEAR = 30
+const FOG_FAR = 90
 const FINISH_LINE = 500  // Meta a 500 metros
 
 // ── Setup helpers ────────────────────────────────────────────────────────────
@@ -68,9 +68,9 @@ export function RoadScene() {
         const canvas = canvasRef.current
 
         // ── Escena base ──────────────────────────────────
-        const scene    = new THREE.Scene()
-        scene.fog      = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR)
-        const camera   = createCamera(canvas)
+        const scene = new THREE.Scene()
+        scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR)
+        const camera = createCamera(canvas)
         const renderer = createRenderer(canvas)
 
         // ── Luces ────────────────────────────────────────
@@ -84,7 +84,7 @@ export function RoadScene() {
 
         // ── Línea de meta ────────────────────────────────
         const finishGeo = new THREE.PlaneGeometry(8, 0.5)
-        const finishMat = new THREE.MeshBasicMaterial({ 
+        const finishMat = new THREE.MeshBasicMaterial({
             color: 0xffff00,
             emissive: 0xffff00,
             emissiveIntensity: 0.8
@@ -107,7 +107,7 @@ export function RoadScene() {
 
         // ── Game loop ────────────────────────────────────
         let scrollZ = 0
-        let lastTs  = null
+        let lastTs = null
         let animId
         gameStateRef.current.startTime = performance.now()
 
@@ -125,8 +125,8 @@ export function RoadScene() {
             const elapsedSec = (ts - gameStateRef.current.startTime) / 1000
             setElapsed(elapsedSec)
             setDistance(scrollZ)
-            
-            console.log('ScrollZ:', scrollZ.toFixed(2), 'Progress:', (scrollZ/FINISH_LINE*100).toFixed(1) + '%')
+
+            console.log('ScrollZ:', scrollZ.toFixed(2), 'Progress:', (scrollZ / FINISH_LINE * 100).toFixed(1) + '%')
 
             // Verificar si llegó a la meta
             if (scrollZ >= FINISH_LINE && !gameStateRef.current.finished) {
@@ -152,12 +152,12 @@ export function RoadScene() {
 
             // OBSTACLES — actualizar y detectar colisiones
             obstacleManager.update(scrollZ)
-            
+
             if (checkCollisions(car, obstacleManager.obstacles)) {
                 triggerBounce()
                 gameStateRef.current.lives--
                 setLives(gameStateRef.current.lives)
-                
+
                 // Remover obstáculo con el que chocó
                 for (let i = obstacleManager.obstacles.length - 1; i >= 0; i--) {
                     const obs = obstacleManager.obstacles[i]
@@ -171,7 +171,7 @@ export function RoadScene() {
                         }
                     }
                 }
-                
+
                 if (gameStateRef.current.lives <= 0) {
                     gameStateRef.current.dead = true
                     setGameOver(true)
@@ -230,19 +230,26 @@ export function RoadScene() {
                             height: '100%',
                             background: 'linear-gradient(90deg, #00ff00, #00cc00)',
                             transition: 'width 0.3s ease-out',
-                            boxShadow: '0 0 15px rgba(0,255,0,0.8)'
+                            boxShadow: '0 0 15px rgba(0,255,0,0.8)',
+                            position: 'absolute',
+                            left: 0,
+                            top: 0
                         }} />
                         <span style={{
                             position: 'absolute',
-                            width: '100%',
-                            textAlign: 'center',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             color: 'white',
                             fontSize: '16px',
                             fontWeight: 'bold',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-                            fontFamily: 'monospace'
+                            textShadow: '2px 2px 4px rgba(0,0,0,0.9)',
+                            fontFamily: 'monospace',
+                            zIndex: 1
                         }}>
                             {Math.floor(distance)}m / {FINISH_LINE}m ({progressPercent.toFixed(0)}%)
                         </span>
